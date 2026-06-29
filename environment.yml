@@ -16,6 +16,7 @@ dependencies:
     - transitions
     - mss
     - numpy==1.26.4
+    - scipy==1.11.4
     - mouse
     - keyboard
     - beautifultable
