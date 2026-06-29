@@ -15,6 +15,6 @@ echo Calling build.py inside the sword environment...
 
 echo.
 echo ====================================================
-echo Build process finished! Check the sword_v* folder.
+echo Build process finished! Check the dist/sword_v* folder.
 echo ====================================================
 pause

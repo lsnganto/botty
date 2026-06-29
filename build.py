@@ -49,7 +49,7 @@ if __name__ == "__main__":
     if args.version != "":
         print(f"Releasing new version: {args.version}")
         os.system(f"git checkout -b new-release-v{args.version}")
-        sword_dir = f"sword_v{args.version}"
+        sword_dir = f"dist/sword_v{args.version}"
         version_code = ""
         with open('src/version.py', 'r') as f:
             version_code = f.read()
@@ -58,8 +58,10 @@ if __name__ == "__main__":
         with open('src/version.py', 'w') as f:
             f.write(new_version_code)
     else:
-        sword_dir = f"sword_v{__version__}"
+        sword_dir = f"dist/sword_v{__version__}"
         print(f"Building version: {__version__}")
+
+    os.makedirs("dist", exist_ok=True)
 
     clean_up()
 
