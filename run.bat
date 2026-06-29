@@ -34,6 +34,7 @@ start cmd /k %CONDA_PATH% env update -f environment.yml
 GOTO MENU
 
 :COMPILE
+%CONDA_PATH% run -n sword python -m PyInstaller --help > nul 2>&1
 %CONDA_PATH% run -n sword python ./build.py
 GOTO MENU
 

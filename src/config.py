@@ -341,7 +341,17 @@ class Config:
             "speed_factor": float(self._select_val("scepters", "speed_factor")),
             "apply_pather_adjustment": bool(int(self._select_val("scepters", "apply_pather_adjustment"))),
         }
+        self.anti_detect = {
+            "enabled":                 bool(int(_default_iff(self._select_val("anti_detect", "enabled"), "", "1"))),
+            "between_game_delay_min":  float(_default_iff(self._select_val("anti_detect", "between_game_delay_min"), "", "5")),
+            "between_game_delay_max":  float(_default_iff(self._select_val("anti_detect", "between_game_delay_max"), "", "20")),
+            "max_hours_per_day":       float(_default_iff(self._select_val("anti_detect", "max_hours_per_day"), "", "3.5")),
+            "break_jitter_pct":        float(_default_iff(self._select_val("anti_detect", "break_jitter_pct"), "", "20")),
+            "auto_randomize":          bool(int(_default_iff(self._select_val("anti_detect", "auto_randomize"), "", "1"))),
+        }
+
         stash_destination_str = self._select_val("transmute","stash_destination")
+
         transmute_str = self._select_val("transmute","transmute")
         self.configs["transmute"]["parser"] = {
             "stash_destination": [int(x.strip()) for x in stash_destination_str.split(",")],

@@ -40,6 +40,7 @@ from run import Pindle, ShenkEld, Trav, Nihlathak, Arcane, Diablo
 from town import TownManager, A1, A2, A3, A4, A5, town_manager
 
 from messages import Messenger
+import anti_detect
 
 class Bot:
 
@@ -435,7 +436,9 @@ class Bot:
                 if not self._pausing:
                     self.toggle_pause()
 
-                wait(Config().general["break_length_m"]*60)
+                # Anti-detect: apply jitter to break duration so it's not a predictable fixed value
+                jittered_break_m = anti_detect.randomize_break_duration(Config().general["break_length_m"])
+                wait(jittered_break_m * 60)
 
                 break_msg = f'Break over, will now run for {hms(Config().general["max_runtime_before_break_m"]*60)}.'
                 Logger.info(break_msg)
@@ -450,6 +453,15 @@ class Bot:
         self._do_runs = copy(self._do_runs_reset)
         if Config().general["randomize_runs"]:
             self.shuffle_runs()
+        # Anti-detect: auto-shuffle runs every cycle (overrides config if enabled)
+        anti_detect.ensure_randomize_runs(self)
+
+        # Anti-detect: enforce daily play time limit (stops bot if limit reached)
+        anti_detect.daily_session_guard()
+
+        # Anti-detect: random delay before starting next game
+        anti_detect.between_game_delay()
+
         self.trigger_or_stop("init")
 
     def on_end_run(self):
