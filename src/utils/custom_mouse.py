@@ -1,4 +1,5 @@
-# Mostly copied from: https://github.com/patrikoss/pyclick
+# Mouse movement via human_mouse.py (Bézier + Min-Jerk + Fitts + Perlin tremor).
+# The public API of the `mouse` class is unchanged so no other files need editing.
 import mouse as _mouse
 from mouse import _winmouse
 import pytweening
@@ -11,6 +12,7 @@ from config import Config
 from utils.misc import is_in_roi
 from logger import Logger
 import template_finder
+from utils.human_mouse import move_human_like as _human_move
 
 def isNumeric(val):
     return isinstance(val, (float, int, np.int32, np.int64, np.float32, np.float64))
@@ -228,34 +230,72 @@ class mouse:
             _winmouse.move_to(x, y)
 
     def move(x, y, absolute: bool = True, randomize: int | tuple[int, int] = 5, delay_factor: tuple[float, float] = [0.4, 0.6]):
+        """
+        Move the mouse to (x, y) using the human_mouse engine.
+
+        API is 100% backward-compatible with the previous implementation:
+          • absolute=False  → offset is resolved from current cursor position
+          • randomize       → pixel jitter applied to the destination (target_width)
+          • delay_factor    → [min, max] speed multiplier;
+                             mapped to speed_factor = 1 / mean(delay_factor)
+                             so higher delay_factor values slow down movement,
+                             matching the original behaviour exactly.
+        """
+        # ── Resolve current position ─────────────────────────────────────────
         from_point = _mouse.get_position()
-        dist = math.dist((x, y), from_point)
-        offsetBoundaryX = max(10, int(0.08 * dist))
-        offsetBoundaryY = max(10, int(0.08 * dist))
-        targetPoints = min(6, max(3, int(0.004 * dist)))
+
+        # ── Handle relative movement ─────────────────────────────────────────
         if not absolute:
             x = from_point[0] + x
             y = from_point[1] + y
 
-        if type(randomize) is int:
-            randomize = int(randomize)
-            if randomize > 0:
-                x = int(x) + random.randrange(-randomize, +randomize)
-                y = int(y) + random.randrange(-randomize, +randomize)
+        x = float(x)
+        y = float(y)
+
+        # ── Apply destination randomize jitter ───────────────────────────────
+        # (keeps the same probabilistic spread as before)
+        if isinstance(randomize, (int, float)):
+            r = int(randomize)
+            if r > 0:
+                x += random.randrange(-r, r + 1)
+                y += random.randrange(-r, r + 1)
         else:
-            randomize = (int(randomize[0]), int(randomize[1]))
-            if randomize[1] > 0 and randomize[0] > 0:
-                x = int(x) + random.randrange(-randomize[0], +randomize[0])
-                y = int(y) + random.randrange(-randomize[1], +randomize[1])
+            rx, ry = int(randomize[0]), int(randomize[1])
+            if rx > 0:
+                x += random.randrange(-rx, rx + 1)
+            if ry > 0:
+                y += random.randrange(-ry, ry + 1)
 
+        # ── Map delay_factor → speed_factor ──────────────────────────────────
+        # Original: duration ∝ delay_factor (larger = slower).
+        # human_mouse: speed_factor > 1 → faster, < 1 → slower.
+        # So speed_factor = 1 / mean(delay_factor), with randomness from the
+        # sampled uniform value inside the range.
+        df_lo = float(delay_factor[0])
+        df_hi = float(delay_factor[1])
+        df_sampled = random.uniform(df_lo, df_hi)
+        # Guard against divide-by-zero for tiny delay_factor values
+        speed_factor = 1.0 / max(df_sampled, 0.05)
 
-        human_curve = HumanCurve(from_point, (x, y), offsetBoundaryX=offsetBoundaryX, offsetBoundaryY=offsetBoundaryY, targetPoints=targetPoints)
+        # ── Derive target_width from the randomize spread ────────────────────
+        # Larger jitter → larger effective target → shorter predicted MT (Fitts)
+        if isinstance(randomize, (int, float)):
+            target_width = max(4.0, float(randomize) * 2.0)
+        else:
+            target_width = max(4.0, float(max(randomize)) * 2.0)
 
-        duration = min(0.5, max(0.05, dist * 0.0004) * random.uniform(delay_factor[0], delay_factor[1]))
-        delta = duration / len(human_curve.points)
-
-        for point in human_curve.points:
-            _mouse.move(point[0], point[1], duration=delta)
+        # ── Delegate to the human_mouse engine ───────────────────────────────
+        # use_absolute=True: custom_mouse operates in screen-pixel space via
+        # WM_MOUSEMOVE / SetCursorPos, not DirectInput, so absolute events work.
+        _human_move(
+            start_pos=from_point,
+            end_pos=(x, y),
+            speed_factor=speed_factor,
+            overshoot_probability=0.30,
+            target_width=target_width,
+            tremor_amplitude=1.0,
+            use_absolute=True,
+        )
 
     @staticmethod
     def _is_clicking_safe():

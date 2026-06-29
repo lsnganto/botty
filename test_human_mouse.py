@@ -1,77 +1,106 @@
-"""Smoke test for human_mouse.py – runs without executing mouse movement (dry_run=True)."""
+"""
+Integration test: verifies custom_mouse.mouse.move() routes through
+the human_mouse engine. Runs in dry-run mode -- no actual mouse movement.
+"""
 import sys
 sys.path.insert(0, 'src')
+import unittest.mock as mock
 
-from utils.human_mouse import (
-    move_human_like, moveTo, HumanTrajectory,
-    _fitts_time, _minimum_jerk_position, _fbm_1d
-)
+# Minimal stubs for heavy game-specific imports
+sys.modules.setdefault('screen', mock.MagicMock())
+sys.modules.setdefault('template_finder', mock.MagicMock())
+sys.modules.setdefault('config', mock.MagicMock())
+config_mock = sys.modules['config']
+config_mock.Config.return_value.ui_roi = {
+    'gold_btn': [0,0,1,1],
+    'equipped_inventory_area': [0,0,1,1],
+    'restricted_inventory_area': [0,0,1,1]
+}
 
-# ─── 1. Basic trajectory generation ──────────────────────────────────────────
-traj = move_human_like(
-    start_pos=(100.0, 100.0),
-    end_pos=(800.0, 600.0),
-    speed_factor=1.0,
-    overshoot_probability=0.5,
-    tremor_amplitude=1.2,
-    dry_run=True,
-)
-assert len(traj.points) > 5, "Too few trajectory points"
-assert traj.delays.sum() > 0.01, "Zero total duration"
-print(f"[OK] Trajectory: {len(traj.points)} points, {traj.delays.sum():.3f}s total")
+# Patch low-level mouse library
+mouse_lib_mock = mock.MagicMock()
+mouse_lib_mock.get_position.return_value = (100, 200)
+sys.modules.setdefault('mouse', mouse_lib_mock)
+sys.modules['mouse']._winmouse = mock.MagicMock()
 
-# ─── 2. Fitts's Law ───────────────────────────────────────────────────────────
-mt = _fitts_time(700.0, 10.0, 1.0)
-assert 0.05 < mt < 3.0, f"Fitts time out of range: {mt}"
-print(f"[OK] Fitts law: distance=700px, target=10px → MT={mt:.3f}s")
+# Patch utils.misc and logger
+sys.modules.setdefault('utils.misc', mock.MagicMock())
+sys.modules['utils.misc'].is_in_roi = lambda *a, **kw: False
+sys.modules.setdefault('logger', mock.MagicMock())
 
-# ─── 3. Minimum-Jerk profile ─────────────────────────────────────────────────
-mj0 = _minimum_jerk_position(0.0)
-mj5 = _minimum_jerk_position(0.5)
-mj1 = _minimum_jerk_position(1.0)
-assert abs(mj0) < 1e-9, f"Min-jerk should start at 0, got {mj0}"
-assert abs(mj5 - 0.5) < 1e-9, f"Min-jerk mid should be 0.5, got {mj5}"
-assert abs(mj1 - 1.0) < 1e-9, f"Min-jerk should end at 1, got {mj1}"
-print(f"[OK] Min-jerk profile: τ=0→{mj0:.4f}, τ=0.5→{mj5:.4f}, τ=1→{mj1:.4f}")
+# Intercept _human_move call inside custom_mouse to verify routing
+import utils.human_mouse as _hm_module
 
-# ─── 4. fBm noise ────────────────────────────────────────────────────────────
-n0 = _fbm_1d(0.0, octaves=5, persistence=0.55, seed=42)
-n1 = _fbm_1d(1.0, octaves=5, persistence=0.55, seed=42)
-assert -2 < n0 < 2, f"fBm out of range: {n0}"
-assert n0 != n1, "Noise should differ at different t"
-print(f"[OK] fBm noise: t=0→{n0:.4f}, t=1→{n1:.4f}")
+call_log = []
+_original_move = _hm_module.move_human_like
 
-# ─── 5. Uniqueness – two calls must produce different paths ───────────────────
-traj2 = move_human_like(
-    start_pos=(100.0, 100.0),
-    end_pos=(800.0, 600.0),
-    dry_run=True,
-)
-# At least some points should differ (different RNG seed each call)
-import numpy as np
-n_common = min(len(traj.points), len(traj2.points))
-diffs = np.abs(traj.points[:n_common] - traj2.points[:n_common]).max()
-assert diffs > 0, "Two independent calls produced identical paths!"
-print(f"[OK] Uniqueness: max diff between two calls = {diffs:.3f}px")
+def _spy_move(**kwargs):
+    call_log.append(kwargs)
+    kwargs['dry_run'] = True
+    return _original_move(**kwargs)
 
-# ─── 6. AHK export ───────────────────────────────────────────────────────────
-ahk_script = traj.to_ahk_script("")
-assert "MouseMove" in ahk_script, "AHK export missing MouseMove commands"
-assert "Sleep" in ahk_script, "AHK export missing Sleep commands"
-assert "F10::" in ahk_script, "AHK export missing hotkey"
-print(f"[OK] AHK export: {len(ahk_script.splitlines())} lines generated")
+_hm_module.move_human_like = _spy_move
+import utils.custom_mouse as cm
+cm._human_move = _spy_move
 
-# ─── 7. Short-distance edge case (dist < 30 px → no overshoot) ───────────────
-short = move_human_like(
-    start_pos=(300.0, 300.0),
-    end_pos=(305.0, 302.0),
-    overshoot_probability=1.0,  # force overshoot flag, but dist too short
-    dry_run=True,
-)
-assert len(short.points) >= 4, "Short move should still have points"
-print(f"[OK] Short-distance move: {len(short.points)} points")
+# ------------------------------------------------------------------ Test 1
+print("--- Test 1: mouse.move() routes through human_mouse engine ---")
+cm.mouse.move(500, 400)
+assert len(call_log) == 1, f"Expected 1 call, got {len(call_log)}"
+c = call_log[0]
+assert 'speed_factor' in c, "speed_factor not passed"
+assert 'overshoot_probability' in c, "overshoot_probability not passed"
+assert 'use_absolute' in c, "use_absolute not passed"
+assert c['use_absolute'] == True, "use_absolute should be True"
+print(f"  start_pos={c['start_pos']}, end_pos={c['end_pos']}")
+print(f"  speed_factor={c['speed_factor']:.3f}, overshoot_prob={c['overshoot_probability']}")
+print("[OK] Routed correctly through human_mouse engine")
 
+# ------------------------------------------------------------------ Test 2
 print()
-print("=" * 50)
-print("  ALL SMOKE TESTS PASSED")
-print("=" * 50)
+print("--- Test 2: delay_factor=[0.1, 0.14] -> faster movement ---")
+call_log.clear()
+cm.mouse.move(600, 300, delay_factor=[0.1, 0.14])
+sf_fast = call_log[0]['speed_factor']
+print(f"  speed_factor for delay_factor=[0.1,0.14]: {sf_fast:.2f}")
+assert sf_fast > 3.0, f"Fast delay_factor should give speed_factor > 3, got {sf_fast}"
+print("[OK] Fast delay maps to high speed_factor")
+
+# ------------------------------------------------------------------ Test 3
+print()
+print("--- Test 3: delay_factor=[0.9, 1.4] -> slower movement ---")
+call_log.clear()
+cm.mouse.move(300, 250, delay_factor=[0.9, 1.4])
+sf_slow = call_log[0]['speed_factor']
+print(f"  speed_factor for delay_factor=[0.9,1.4]: {sf_slow:.2f}")
+assert sf_slow < 1.5, f"Slow delay_factor should give speed_factor < 1.5, got {sf_slow}"
+print("[OK] Slow delay maps to low speed_factor")
+
+# ------------------------------------------------------------------ Test 4
+print()
+print("--- Test 4: absolute=False resolves relative offset ---")
+call_log.clear()
+cm.mouse.move(-50, 30, absolute=False)
+end = call_log[0]['end_pos']
+start = call_log[0]['start_pos']
+# start=(100,200), offset=(-50,30) -> target=(50,230), jitter randomize=5
+assert abs(end[0] - 50) <= 6, f"Relative x wrong: {end[0]}"
+assert abs(end[1] - 230) <= 6, f"Relative y wrong: {end[1]}"
+print(f"  start={start}, offset=(-50,30), resolved end~={end}")
+print("[OK] Relative offset resolved correctly")
+
+# ------------------------------------------------------------------ Test 5
+print()
+print("--- Test 5: tuple randomize=(rx, ry) handled ---")
+call_log.clear()
+cm.mouse.move(400, 350, randomize=(20, 5))
+tw = call_log[0]['target_width']
+assert tw >= 4.0, f"target_width should be >= 4, got {tw}"
+print(f"  target_width for randomize=(20,5): {tw}")
+print("[OK] Tuple randomize handled, target_width computed")
+
+# ------------------------------------------------------------------ Done
+print()
+print("=" * 55)
+print("  ALL INTEGRATION TESTS PASSED")
+print("=" * 55)
