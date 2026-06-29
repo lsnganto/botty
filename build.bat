@@ -4,6 +4,14 @@ echo ====================================================
 echo             BUILDING SWORD TO EXE
 echo ====================================================
 echo.
+echo   Targets:
+echo     main.exe          ^(CLI bot^)
+echo     shopper.exe       ^(Shopper bot^)
+echo     launcher_gui.exe  ^(GUI configuration launcher^)
+echo.
+echo   Use --no-gui flag to skip launcher_gui.exe build:
+echo     build.bat --no-gui
+echo.
 
 SET CONDA_PATH="%USERPROFILE%\miniconda3\condabin\conda.bat"
 IF NOT EXIST %CONDA_PATH% (
@@ -11,7 +19,7 @@ IF NOT EXIST %CONDA_PATH% (
 )
 
 echo Calling build.py inside the sword environment...
-%CONDA_PATH% run -n sword python ./build.py
+%CONDA_PATH% run -n sword python ./build.py %*
 
 echo.
 echo ====================================================

@@ -2,6 +2,8 @@ import ssl_patch
 from dataclasses import dataclass
 import keyboard
 import os
+import sys
+import argparse
 from beautifultable import BeautifulTable
 import logging
 import traceback
@@ -101,12 +103,29 @@ def main():
 
 
 if __name__ == "__main__":
-    # To avoid cmd just closing down, except any errors and add a input() to the end
-    try:
-        game_controller = GameController()
-        debugger_controller = GraphicDebuggerController()
-        main()
-    except:
-        traceback.print_exc()
-    print("Press Enter to exit ...")
-    input()
+    parser = argparse.ArgumentParser(description="Botty — Diablo II Resurrected bot")
+    parser.add_argument(
+        "--gui", action="store_true",
+        help="Launch the graphical configuration launcher instead of CLI mode."
+    )
+    args, _ = parser.parse_known_args()
+
+    if args.gui:
+        # ── GUI Mode ────────────────────────────────────────────────
+        try:
+            from launcher.app import run_gui
+            sys.exit(run_gui())
+        except Exception:
+            traceback.print_exc()
+            print("Press Enter to exit ...")
+            input()
+    else:
+        # ── CLI Mode (original behaviour) ───────────────────────────
+        try:
+            game_controller = GameController()
+            debugger_controller = GraphicDebuggerController()
+            main()
+        except:
+            traceback.print_exc()
+        print("Press Enter to exit ...")
+        input()
