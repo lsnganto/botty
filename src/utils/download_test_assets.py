@@ -1,3 +1,4 @@
+import ssl_patch
 import urllib.request
 import zipfile
 import os

@@ -1,3 +1,4 @@
+import ssl_patch
 from dataclasses import dataclass
 import keyboard
 import os
