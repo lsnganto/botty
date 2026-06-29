@@ -9,7 +9,7 @@ from cryptography.fernet import Fernet
 import string
 
 
-parser = argparse.ArgumentParser(description="Build Botty")
+parser = argparse.ArgumentParser(description="Build Sword")
 parser.add_argument(
     "-v" , "--version",
     type=str,
@@ -24,7 +24,7 @@ parser.add_argument(
 parser.add_argument(
     "-r", "--random_name",
     action='store_true',
-    help="Will generate a random name for the botty exe")
+    help="Will generate a random name for the sword exe")
 parser.add_argument(
     "-k", "--use_key",
     action='store_true',
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     if args.version != "":
         print(f"Releasing new version: {args.version}")
         os.system(f"git checkout -b new-release-v{args.version}")
-        botty_dir = f"botty_v{args.version}"
+        sword_dir = f"sword_v{args.version}"
         version_code = ""
         with open('src/version.py', 'r') as f:
             version_code = f.read()
@@ -58,44 +58,44 @@ if __name__ == "__main__":
         with open('src/version.py', 'w') as f:
             f.write(new_version_code)
     else:
-        botty_dir = f"botty_v{__version__}"
+        sword_dir = f"sword_v{__version__}"
         print(f"Building version: {__version__}")
 
     clean_up()
 
-    if os.path.exists(botty_dir):
-        for path in Path(botty_dir).glob("**/*"):
+    if os.path.exists(sword_dir):
+        for path in Path(sword_dir).glob("**/*"):
             if path.is_file():
                 os.remove(path)
             elif path.is_dir():
                 shutil.rmtree(path)
-        shutil.rmtree(botty_dir)
+        shutil.rmtree(sword_dir)
 
     for exe in ["main.py", "shopper.py"]:
         key_cmd = " "
         if args.use_key:
             key = Fernet.generate_key().decode("utf-8")
             key_cmd = " --key " + key
-        installer_cmd = f"pyinstaller --onefile --distpath {botty_dir}{key_cmd} --exclude-module graphviz --paths .\\src --paths {args.conda_path}\\envs\\botty\\Lib\\site-packages src\\{exe}"
+        installer_cmd = f"python -m PyInstaller --onefile --distpath {sword_dir}{key_cmd} --exclude-module graphviz --paths .\\src --paths {args.conda_path}\\envs\\sword\\Lib\\site-packages src\\{exe}"
         os.system(installer_cmd)
 
-    os.system(f"cd {botty_dir} && mkdir config && cd ..")
+    os.system(f"cd {sword_dir} && mkdir config && cd ..")
 
-    with open(f"{botty_dir}/config/custom.ini", "w") as f:
+    with open(f"{sword_dir}/config/custom.ini", "w") as f:
         f.write("; Add parameters you want to overwrite from param.ini here")
-    shutil.copy("config/game.ini", f"{botty_dir}/config/")
-    shutil.copy("config/params.ini", f"{botty_dir}/config/")
-    shutil.copy("config/shop.ini", f"{botty_dir}/config/")
-    shutil.copy("config/default.bnip", f"{botty_dir}/config/")
-    os.makedirs(f"{botty_dir}/config/bnip", exist_ok=True)
-    shutil.copy("README.md", f"{botty_dir}/")
-    shutil.copytree("assets", f"{botty_dir}/assets")
+    shutil.copy("config/game.ini", f"{sword_dir}/config/")
+    shutil.copy("config/params.ini", f"{sword_dir}/config/")
+    shutil.copy("config/shop.ini", f"{sword_dir}/config/")
+    shutil.copy("config/default.bnip", f"{sword_dir}/config/")
+    os.makedirs(f"{sword_dir}/config/bnip", exist_ok=True)
+    shutil.copy("README.md", f"{sword_dir}/")
+    shutil.copytree("assets", f"{sword_dir}/assets")
     clean_up()
 
     if args.random_name:
         print("Generate random names")
         new_name = ''.join(random.choices(string.ascii_letters, k=random.randint(6, 14)))
-        os.rename(f'{botty_dir}/main.exe', f'{botty_dir}/{new_name}.exe')
+        os.rename(f'{sword_dir}/main.exe', f'{sword_dir}/{new_name}.exe')
 
     if new_version_code is not None:
         os.system(f'git add .')

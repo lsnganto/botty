@@ -127,7 +127,7 @@ class Config:
 
         self.general = {
             "saved_games_folder": self._select_val("general", "saved_games_folder"),
-            "name": _default_iff(self._select_val("general", "name"), "", "botty"),
+            "name": _default_iff(self._select_val("general", "name"), "", "sword"),
             "max_game_length_s": float(self._select_val("general", "max_game_length_s")),
             "max_consecutive_fails": int(self._select_val("general", "max_consecutive_fails")),
             "max_runtime_before_break_m": float(_default_iff(self._select_val("general", "max_runtime_before_break_m"), '', 0)),

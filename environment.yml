@@ -1,4 +1,4 @@
-name: botty
+name: sword
 channels:
   - conda-forge
 dependencies:
@@ -6,7 +6,8 @@ dependencies:
   - pywin32
   - pip
   - leptonica
-  - tesseract=5.1.0
+  - tesseract=5.2.0
+  - tesserocr
   - pkg-config
   - rapidfuzz
   - pip:
@@ -14,7 +15,7 @@ dependencies:
     - opencv-python==4.5.5.64
     - transitions
     - mss
-    - numpy
+    - numpy==1.26.4
     - mouse
     - keyboard
     - beautifultable
@@ -29,9 +30,10 @@ dependencies:
     - psutil
     - cryptography
     - pillow
-    - discord.py
+    - discord.py==1.7.3
+    - aiohttp==3.7.4.post0
     - parse
-    - dependencies/tesserocr-2.5.2-cp310-cp310-win_amd64.whl
     - typing_extensions
     - colorama
     - dataclasses-json
+    - pyparsing
